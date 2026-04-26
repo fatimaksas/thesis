@@ -250,9 +250,11 @@ def validate_label_compatibility(meta: pd.DataFrame) -> None:
         raise ValueError(f"Expected at least two classes for training, found labels: {unique_labels}")
 
     per_source = meta.groupby("source_dataset")["label"].nunique().to_dict()
-    incompatible = [source for source, n in per_source.items() if n < 1]
+    incompatible = [source for source, n in per_source.items() if n < 2]
     if incompatible:
-        raise ValueError(f"Incompatible or unlabeled sources found: {incompatible}")
+        raise ValueError(
+            f"Incompatible sources found (need at least 2 classes per source): {incompatible}"
+        )
 
 
 def can_stratify(keys: pd.Series) -> bool:
@@ -372,10 +374,16 @@ def make_transforms(image_size: int) -> Tuple[transforms.Compose, transforms.Com
 
 
 def compute_class_weights(labels: pd.Series) -> torch.Tensor:
+    unique = sorted(pd.Series(labels).dropna().astype(int).unique().tolist())
+    expected = list(range(len(unique)))
+    if unique != expected:
+        raise ValueError(
+            f"Labels must be contiguous integers starting at 0, got {unique}."
+        )
     counts = labels.value_counts().sort_index()
     total = counts.sum()
     weights = {cls: total / (len(counts) * count) for cls, count in counts.items()}
-    return torch.tensor([weights.get(i, 1.0) for i in range(int(counts.index.max()) + 1)], dtype=torch.float32)
+    return torch.tensor([weights[i] for i in expected], dtype=torch.float32)
 
 
 def evaluate(model: nn.Module, loader: DataLoader, device: torch.device) -> Dict[str, object]:

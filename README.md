@@ -13,7 +13,7 @@ Unified training pipeline for combining three datasets (breast, lungs, ISIC) int
 
 Use absolute path root:
 
-`C:\Users\fatem\Desktop\thesis_project\data`
+`C:\Users\<username>\Desktop\thesis_project\data` or `/absolute/path/to/thesis_project/data`
 
 Expected files inside data root:
 
