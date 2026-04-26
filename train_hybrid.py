@@ -5,7 +5,7 @@ import random
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -125,7 +125,7 @@ def guess_label_column(df: pd.DataFrame) -> Optional[str]:
             return lower_map[c]
     # fallback: binary numeric col if present
     for c in df.columns:
-        values = pd.Series(df[c]).dropna().unique()
+        values = df[c].dropna().unique()
         if 0 < len(values) <= 5:
             return c
     return None
@@ -386,7 +386,7 @@ def compute_class_weights(labels: pd.Series) -> torch.Tensor:
     return torch.tensor([weights[i] for i in expected], dtype=torch.float32)
 
 
-def evaluate(model: nn.Module, loader: DataLoader, device: torch.device) -> Dict[str, object]:
+def evaluate(model: nn.Module, loader: DataLoader, device: torch.device) -> Dict[str, Any]:
     model.eval()
     y_true, y_pred, sources = [], [], []
     with torch.no_grad():
@@ -444,7 +444,7 @@ def train_model(
             optimizer.step()
             train_loss += loss.item() * x.size(0)
 
-        train_loss /= max(len(train_loader.dataset), 1)
+        train_loss /= len(train_loader.dataset)
 
         model.eval()
         val_loss = 0.0
@@ -454,7 +454,7 @@ def train_model(
                 logits = model(x)
                 loss = criterion(logits, y)
                 val_loss += loss.item() * x.size(0)
-        val_loss /= max(len(val_loader.dataset), 1)
+        val_loss /= len(val_loader.dataset)
 
         print(f"Epoch {epoch}/{cfg.epochs} | train_loss={train_loss:.4f} | val_loss={val_loss:.4f}")
 
