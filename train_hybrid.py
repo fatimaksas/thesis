@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 import argparse
 import json
-import os
 import random
 import zipfile
-from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -21,6 +19,7 @@ from torchvision import models, transforms
 
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff", ".webp"}
+LABEL_FILE_HINTS = ["label", "ground", "meta", "train", "annotation"]
 
 
 def set_seed(seed: int) -> None:
@@ -127,7 +126,7 @@ def guess_label_column(df: pd.DataFrame) -> Optional[str]:
     # fallback: binary numeric col if present
     for c in df.columns:
         values = pd.Series(df[c]).dropna().unique()
-        if len(values) and len(values) <= 5:
+        if 0 < len(values) <= 5:
             return c
     return None
 
@@ -186,7 +185,11 @@ def generic_dataset_metadata(dataset_root: Path, source_name: str) -> pd.DataFra
     label_files = []
     for ext in ("*.csv", "*.tsv"):
         label_files.extend(dataset_root.rglob(ext))
-    label_files = [p for p in label_files if any(t in p.name.lower() for t in ["label", "ground", "meta", "train", "annotation"])]
+    label_files = [
+        p
+        for p in label_files
+        if any(hint in p.name.lower() for hint in LABEL_FILE_HINTS)
+    ]
 
     image_map = discover_image_files(dataset_root)
     if label_files:
@@ -261,7 +264,11 @@ def stratified_split(meta: pd.DataFrame, seed: int) -> Tuple[pd.DataFrame, pd.Da
     meta = meta.sample(frac=1.0, random_state=seed).reset_index(drop=True)
     strat_key = meta["label"].astype(str) + "__" + meta["source_dataset"].astype(str)
 
-    strat1 = strat_key if can_stratify(strat_key) else meta["label"] if can_stratify(meta["label"]) else None
+    strat1 = None
+    if can_stratify(strat_key):
+        strat1 = strat_key
+    elif can_stratify(meta["label"]):
+        strat1 = meta["label"]
 
     train_val, test = train_test_split(
         meta,
@@ -271,7 +278,11 @@ def stratified_split(meta: pd.DataFrame, seed: int) -> Tuple[pd.DataFrame, pd.Da
     )
 
     train_val_key = train_val["label"].astype(str) + "__" + train_val["source_dataset"].astype(str)
-    strat2 = train_val_key if can_stratify(train_val_key) else train_val["label"] if can_stratify(train_val["label"]) else None
+    strat2 = None
+    if can_stratify(train_val_key):
+        strat2 = train_val_key
+    elif can_stratify(train_val["label"]):
+        strat2 = train_val["label"]
 
     train, val = train_test_split(
         train_val,
@@ -500,12 +511,12 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    data_root = Path(args.data_root).expanduser().resolve()
+    data_root_input = Path(args.data_root).expanduser()
+    if not data_root_input.is_absolute():
+        raise ValueError("--data-root must be an absolute path")
+    data_root = data_root_input.resolve()
     output_dir = ensure_dir(Path(args.output_dir).expanduser().resolve())
     extracted_root = ensure_dir(output_dir / "extracted")
-
-    if not data_root.is_absolute():
-        raise ValueError("--data-root must be an absolute path")
 
     set_seed(args.seed)
 

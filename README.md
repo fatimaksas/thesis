@@ -25,7 +25,7 @@ Expected files inside data root:
 ## Run
 
 ```bash
-python /home/runner/work/thesis/thesis/train_hybrid.py \
+python train_hybrid.py \
   --data-root /absolute/path/to/thesis_project/data \
   --output-dir /absolute/path/to/thesis_project/output \
   --epochs 20 \
